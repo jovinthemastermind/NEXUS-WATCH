@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   N.E.X.U.S. WATCH — CORE MODULE
+   N.E.X.U.S. WATCH — CORE MODULE  v0.1.1
    Foundation for all watch features. No UI. No dependencies.
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -8,13 +8,13 @@
 
   // ─── Namespace ──────────────────────────────────────────────────
   const NexusWatch = {
-    version: '0.1.0',
+    version: '0.1.1',
     ready: false,
     _readyResolvers: [],
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 1. STORAGE — namespaced, JSON-safe, quota-aware
+  // 1. STORAGE
   // ═══════════════════════════════════════════════════════════════
   const STORAGE_PREFIX = 'nexus.watch.';
 
@@ -56,7 +56,7 @@
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 2. EVENT BUS — pub/sub so features don't hard-depend on each other
+  // 2. EVENT BUS
   // ═══════════════════════════════════════════════════════════════
   const Bus = (() => {
     const listeners = new Map();
@@ -90,8 +90,7 @@
   })();
 
   // ═══════════════════════════════════════════════════════════════
-  // 3. HAPTICS — vibration patterns
-  //    Spec: https://developer.mozilla.org/en-US/docs/Web/API/Navigator/vibrate
+  // 3. HAPTICS
   // ═══════════════════════════════════════════════════════════════
   const Haptics = {
     supported: typeof navigator !== 'undefined' && 'vibrate' in navigator,
@@ -102,7 +101,6 @@
       catch (e) { return false; }
     },
 
-    // Basic pulses
     tap()      { return this._fire(12); },
     soft()     { return this._fire(8); },
     double()   { return this._fire([10, 60, 10]); },
@@ -120,14 +118,13 @@
       catch (e) { return false; }
     },
 
-    // Morse-style pattern for custom notifications
     pattern(pulses) {
       return this._fire(pulses);
     },
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 4. BATTERY — monitor and warn
+  // 4. BATTERY
   // ═══════════════════════════════════════════════════════════════
   const Battery = {
     _battery: null,
@@ -148,7 +145,6 @@
             const prev = this._lastLevel;
             this._lastLevel = pct;
             Bus.emit('battery:level', { level: pct, charging: this._battery.charging });
-            // Warn thresholds
             if (pct <= 10 && prev > 10) Bus.emit('battery:critical', { level: pct });
             else if (pct <= 20 && prev > 20) Bus.emit('battery:low', { level: pct });
           }
@@ -183,11 +179,12 @@
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 5. CLOCK — live time, formatted for watch display
+  // 5. CLOCK  — 12h by default, toggleable, persisted
   // ═══════════════════════════════════════════════════════════════
   const Clock = (() => {
     let tickTimer = null;
     let lastMinute = -1;
+    let use24h = Storage.get('clock.24h', false);   // default: 12-hour
 
     function format12h(date) {
       let h = date.getHours();
@@ -220,7 +217,6 @@
         if (now.getMinutes() !== lastMinute) {
           lastMinute = now.getMinutes();
           Bus.emit('clock:minute', now);
-          // Hourly chime
           if (now.getMinutes() === 0) {
             Bus.emit('clock:hour', now);
             Haptics.double();
@@ -234,18 +230,43 @@
       if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
     }
 
+    function set24h(enabled) {
+      use24h = !!enabled;
+      Storage.set('clock.24h', use24h);
+      Bus.emit('clock:format-changed', { use24h });
+      Bus.emit('clock:second', new Date());
+    }
+
+    function toggleFormat() {
+      set24h(!use24h);
+      return use24h;
+    }
+
     return {
       start, stop,
       now: () => new Date(),
       format12h, format24h, dateLine,
+      set24h, toggleFormat,
+      get is24h() { return use24h; },
+
+      // Simple string outputs
       time12: () => { const t = format12h(new Date()); return `${t.h}:${t.mm} ${t.ampm}`; },
       time24: () => { const t = format24h(new Date()); return `${t.hh}:${t.mm}`; },
       time24sec: () => { const t = format24h(new Date()); return `${t.hh}:${t.mm}:${t.ss}`; },
+      // Auto-formatting — the one your UI should call
+      time: () => {
+        if (use24h) {
+          const t = format24h(new Date());
+          return `${t.hh}:${t.mm}`;
+        }
+        const t = format12h(new Date());
+        return `${t.h}:${t.mm} ${t.ampm}`;
+      },
     };
   })();
 
   // ═══════════════════════════════════════════════════════════════
-  // 6. WAKE LOCK — keep screen on when needed (e.g. during voice)
+  // 6. WAKE LOCK
   // ═══════════════════════════════════════════════════════════════
   const WakeLock = {
     _sentinel: null,
@@ -277,12 +298,12 @@
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 7. SCREEN STATE — on/off/dim, auto-sleep
+  // 7. SCREEN
   // ═══════════════════════════════════════════════════════════════
   const Screen = {
-    _state: 'on',                // 'on' | 'dim' | 'off'
+    _state: 'on',
     _autoSleepTimer: null,
-    _autoSleepMs: 30000,         // default 30s
+    _autoSleepMs: 30000,
 
     setState(next) {
       if (this._state === next) return;
@@ -298,7 +319,6 @@
     dim()  { this.setState('dim'); },
     off()  { this.setState('off'); },
 
-    // Call on any user interaction to reset the auto-sleep timer
     poke() {
       if (this._state !== 'on') this.setState('on');
       this._armAutoSleep();
@@ -331,10 +351,8 @@
   // 8. UTILITIES
   // ═══════════════════════════════════════════════════════════════
   const Util = {
-    // Clamp number to range
     clamp(n, min, max) { return Math.min(max, Math.max(min, n)); },
 
-    // Format a duration (ms) as mm:ss or h:mm:ss
     formatDuration(ms) {
       const total = Math.max(0, Math.floor(ms / 1000));
       const h = Math.floor(total / 3600);
@@ -344,10 +362,8 @@
       return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
     },
 
-    // Format steps with thousands separator
     formatNumber(n) { return Number(n).toLocaleString(); },
 
-    // Debounce
     debounce(fn, ms) {
       let t = null;
       return function (...args) {
@@ -356,7 +372,6 @@
       };
     },
 
-    // Throttle (leading edge)
     throttle(fn, ms) {
       let last = 0;
       return function (...args) {
@@ -368,13 +383,10 @@
       };
     },
 
-    // Random int
     randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; },
 
-    // Sleep
     sleep(ms) { return new Promise(r => setTimeout(r, ms)); },
 
-    // UUID (short, for pairing codes etc.)
     shortId(len = 6) {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let out = '';
@@ -384,26 +396,19 @@
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // 9. LIFECYCLE — init, wake, sleep, visibility
+  // 9. LIFECYCLE
   // ═══════════════════════════════════════════════════════════════
   const Lifecycle = {
     async init() {
-      // Battery
       await Battery.init();
-
-      // Clock
       Clock.start();
-
-      // Auto-sleep timer
       Screen._armAutoSleep();
 
-      // Wake on any user interaction
       const poke = () => Screen.poke();
       ['touchstart', 'mousedown', 'keydown', 'click'].forEach(evt => {
         document.addEventListener(evt, poke, { passive: true });
       });
 
-      // Page visibility
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           Bus.emit('app:hidden');
@@ -413,7 +418,6 @@
         }
       });
 
-      // Before unload — persist anything you want
       window.addEventListener('beforeunload', () => {
         Bus.emit('app:unloading');
       });
@@ -447,7 +451,6 @@
   NexusWatch.Util = Util;
   NexusWatch.Lifecycle = Lifecycle;
 
-  // Auto-boot when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => Lifecycle.init());
   } else {
