@@ -48,16 +48,22 @@
   <button id="vibrate">Test Vibration</button>
   <button id="startSteps">Start Step Counter</button>
   <button id="shake">Test Shake Detection</button>
+  <button id="toggleClock">12h / 24h</button>
 
   <script src="nexus-watch-core.js"></script>
   <script src="nexus-watch-sensors.js"></script>
   <script>
     const W = window.NexusWatch;
 
-    // Clock
+    // Clock — uses the auto-formatting method
     W.Bus.on('clock:second', () => {
-      document.getElementById('time').textContent = W.Clock.time24();
+      document.getElementById('time').textContent = W.Clock.time();
       document.getElementById('date').textContent = W.Clock.dateLine(new Date());
+    });
+
+    // Clock format toggle
+    W.Bus.on('clock:format-changed', () => {
+      document.getElementById('time').textContent = W.Clock.time();
     });
 
     // Steps
@@ -93,8 +99,13 @@
       W.Haptics.alert();
       alert('Now shake your device. When detected, it will triple-vibrate.');
     };
+    document.getElementById('toggleClock').onclick = () => {
+      const now24 = W.Clock.toggleFormat();
+      W.Haptics.tap();
+      console.log('Clock format:', now24 ? '24-hour' : '12-hour');
+    };
 
-    // Show goal progress
+    // Goal progress
     setInterval(() => {
       const s = W.Sensors.Steps.get();
       document.getElementById('goal').textContent =
