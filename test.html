@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS Watch Test</title>
+  <style>
+    body {
+      background: #07111f; color: #eaf4ff;
+      font-family: system-ui; padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background: rgba(99,212,255,0.1);
+      border: 1px solid #63d4ff55;
+      border-radius: 16px;
+      padding: 20px; margin: 12px 0;
+    }
+    .big { font-size: 48px; font-weight: 800; color: #63d4ff; }
+    .label { font-size: 12px; letter-spacing: 0.2em; color: #9fb5cc; }
+    button {
+      background: #63d4ff; color: #04111d; border: 0;
+      padding: 14px 24px; border-radius: 999px;
+      font-weight: 700; font-size: 16px; margin: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="label">TIME</div>
+    <div class="big" id="time">--:--</div>
+    <div id="date" style="color:#9fb5cc;"></div>
+  </div>
+
+  <div class="card">
+    <div class="label">STEPS TODAY</div>
+    <div class="big" id="steps">0</div>
+    <div id="goal" style="color:#9fb5cc;"></div>
+  </div>
+
+  <div class="card">
+    <div class="label">BATTERY</div>
+    <div class="big" id="battery">—</div>
+  </div>
+
+  <button id="vibrate">Test Vibration</button>
+  <button id="startSteps">Start Step Counter</button>
+  <button id="shake">Test Shake Detection</button>
+
+  <script src="nexus-watch-core.js"></script>
+  <script src="nexus-watch-sensors.js"></script>
+  <script>
+    const W = window.NexusWatch;
+
+    // Clock
+    W.Bus.on('clock:second', () => {
+      document.getElementById('time').textContent = W.Clock.time24();
+      document.getElementById('date').textContent = W.Clock.dateLine(new Date());
+    });
+
+    // Steps
+    W.Bus.on('steps:step', ({ today }) => {
+      document.getElementById('steps').textContent = W.Util.formatNumber(today);
+    });
+    W.Bus.on('steps:started', () => {
+      W.Haptics.success();
+      console.log('Steps started');
+    });
+    W.Bus.on('steps:permission-denied', () => {
+      alert('Motion permission denied — steps will not count');
+    });
+
+    // Battery
+    W.Bus.on('battery:ready', (b) => {
+      if (b) document.getElementById('battery').textContent = b.level + '%';
+    });
+    W.Bus.on('battery:level', ({ level }) => {
+      document.getElementById('battery').textContent = level + '%';
+    });
+
+    // Shake
+    W.Bus.on('shake:detected', () => {
+      W.Haptics.triple();
+      console.log('Shake detected!');
+    });
+
+    // Buttons
+    document.getElementById('vibrate').onclick = () => W.Haptics.success();
+    document.getElementById('startSteps').onclick = () => W.Sensors.startAll();
+    document.getElementById('shake').onclick = () => {
+      W.Haptics.alert();
+      alert('Now shake your device. When detected, it will triple-vibrate.');
+    };
+
+    // Show goal progress
+    setInterval(() => {
+      const s = W.Sensors.Steps.get();
+      document.getElementById('goal').textContent =
+        `Goal: ${W.Util.formatNumber(s.goal)} (${Math.round(s.progress * 100)}%)`;
+    }, 1000);
+  </script>
+</body>
+</html>
