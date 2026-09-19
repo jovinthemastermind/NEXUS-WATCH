@@ -2,115 +2,726 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NEXUS Watch Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NEXUS Watch</title>
   <style>
+    :root {
+      --bg: #07111f;
+      --panel: rgba(99,212,255,0.08);
+      --border: #63d4ff55;
+      --text: #eaf4ff;
+      --muted: #9fb5cc;
+      --accent: #63d4ff;
+      --accent-dim: #3a9ec4;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
-      background: #07111f; color: #eaf4ff;
-      font-family: system-ui; padding: 20px;
+      background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0; padding: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .header {
+      padding: 14px 16px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 { font-size: 16px; margin: 0; color: var(--accent); letter-spacing: 0.15em; }
+    .header .sub { font-size: 11px; color: var(--muted); }
+
+    .tabs {
+      display: flex; overflow-x: auto;
+      padding: 6px 12px 0;
+      gap: 6px;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      background: transparent; color: var(--muted);
+      border: 1px solid transparent;
+      padding: 8px 14px; border-radius: 999px;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+    }
+    .tab.active {
+      background: var(--panel);
+      border-color: var(--border);
+      color: var(--accent);
+    }
+
+    .view { padding: 16px; display: none; }
+    .view.active { display: block; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px; margin: 12px 0;
       text-align: center;
     }
-    .card {
-      background: rgba(99,212,255,0.1);
-      border: 1px solid #63d4ff55;
-      border-radius: 16px;
-      padding: 20px; margin: 12px 0;
-    }
-    .big { font-size: 48px; font-weight: 800; color: #63d4ff; }
-    .label { font-size: 12px; letter-spacing: 0.2em; color: #9fb5cc; }
+    .big { font-size: 44px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+    .med { font-size: 22px; font-weight: 700; color: var(--accent); }
+    .label { font-size: 11px; letter-spacing: 0.2em; color: var(--muted); margin-bottom: 8px; }
+
     button {
-      background: #63d4ff; color: #04111d; border: 0;
-      padding: 14px 24px; border-radius: 999px;
-      font-weight: 700; font-size: 16px; margin: 6px;
+      background: var(--accent); color: #04111d; border: 0;
+      padding: 12px 18px; border-radius: 999px;
+      font-weight: 700; font-size: 14px; margin: 4px;
       cursor: pointer;
+      touch-action: manipulation;
     }
+    button.ghost {
+      background: transparent; color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    button:disabled { opacity: 0.5; }
+
+    input, select, textarea {
+      background: rgba(0,0,0,0.35); color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px; font-size: 14px; font-family: inherit;
+      width: 100%; margin: 4px 0;
+    }
+    textarea { min-height: 70px; resize: vertical; }
+
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 0; }
+    .row.tight > * { flex: 0 1 auto; min-width: auto; }
+
+    .grid3 {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 6px; max-width: 300px; margin: 12px auto;
+    }
+    .cell {
+      aspect-ratio: 1; background: rgba(0,0,0,0.35);
+      border: 1px solid var(--border); border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 42px; font-weight: 800; cursor: pointer;
+      color: var(--accent);
+      user-select: none;
+    }
+    .cell.x { color: #63d4ff; }
+    .cell.o { color: #ff9fb1; }
+
+    .snake-canvas, .g2048-grid {
+      display: block; margin: 12px auto;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: rgba(0,0,0,0.35);
+      image-rendering: pixelated;
+    }
+    .g2048-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px; padding: 6px;
+      width: 280px; height: 280px;
+      aspect-ratio: 1;
+    }
+    .g2048-cell {
+      background: rgba(99,212,255,0.08);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 18px;
+      color: var(--text);
+    }
+    .g2048-cell[data-v="2"]    { background: #1d4a63; }
+    .g2048-cell[data-v="4"]    { background: #256c8b; }
+    .g2048-cell[data-v="8"]    { background: #2a8bb0; }
+    .g2048-cell[data-v="16"]   { background: #37a3cc; }
+    .g2048-cell[data-v="32"]   { background: #4fc2e8; color: #04111d; }
+    .g2048-cell[data-v="64"]   { background: #71d0ff; color: #04111d; }
+    .g2048-cell[data-v="128"]  { background: #71f0b5; color: #04111d; }
+    .g2048-cell[data-v="256"]  { background: #98f0b5; color: #04111d; }
+    .g2048-cell[data-v="512"]  { background: #ffcb6b; color: #04111d; }
+    .g2048-cell[data-v="1024"] { background: #ff9fb1; color: #04111d; }
+    .g2048-cell[data-v="2048"] { background: #ff6b9f; color: #04111d; }
+
+    .arrow-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);
+      grid-template-rows: repeat(3, 60px);
+      gap: 6px;
+      justify-content: center;
+      margin: 12px auto;
+    }
+    .arrow-pad button {
+      width: 60px; height: 60px; padding: 0;
+      font-size: 24px; border-radius: 12px;
+      margin: 0;
+    }
+
+    .list { text-align: left; margin: 8px 0; }
+    .list-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; margin: 6px 0;
+      background: rgba(0,0,0,0.25);
+      border-radius: 10px; font-size: 14px;
+    }
+
+    .status-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 6px; vertical-align: middle;
+    }
+    .dot-on { background: #71f0b5; box-shadow: 0 0 8px #71f0b5; }
+    .dot-off { background: #ff7f96; }
+
+    .small { font-size: 12px; color: var(--muted); }
+    .center { text-align: center; }
   </style>
 </head>
 <body>
 
-  <div class="card">
-    <div class="label">TIME</div>
-    <div class="big" id="time">--:--</div>
-    <div id="date" style="color:#9fb5cc;"></div>
+  <div class="header">
+    <div>
+      <h1>◉ N.E.X.U.S.</h1>
+      <div class="sub">WATCH TEST</div>
+    </div>
+    <div class="small" id="battery">—</div>
   </div>
 
-  <div class="card">
-    <div class="label">STEPS TODAY</div>
-    <div class="big" id="steps">0</div>
-    <div id="goal" style="color:#9fb5cc;"></div>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-view="clock">🕐 Clock</button>
+    <button class="tab" data-view="timer">⏱ Timer</button>
+    <button class="tab" data-view="ai">🤖 AI</button>
+    <button class="tab" data-view="pair">👥 Pair</button>
+    <button class="tab" data-view="games">🎮 Games</button>
+    <button class="tab" data-view="settings">⚙️ Settings</button>
   </div>
 
-  <div class="card">
-    <div class="label">BATTERY</div>
-    <div class="big" id="battery">—</div>
+  <!-- ══════════════ CLOCK VIEW ══════════════ -->
+  <div class="view active" data-view="clock">
+    <div class="card">
+      <div class="label">TIME</div>
+      <div class="big" id="time">--:--</div>
+      <div id="date" class="small"></div>
+      <button class="ghost" id="toggleClock" style="margin-top:12px;">12h / 24h</button>
+    </div>
+    <div class="card">
+      <div class="label">STEPS TODAY</div>
+      <div class="big" id="steps">0</div>
+      <div id="goal" class="small">—</div>
+      <button id="startSteps" style="margin-top:12px;">Start Step Counter</button>
+    </div>
+    <div class="card">
+      <div class="label">SENSORS</div>
+      <div class="small" id="motionState">still</div>
+      <div class="row tight" style="justify-content:center; margin-top:10px;">
+        <button class="ghost" id="vibrate">Vibrate</button>
+        <button class="ghost" id="shakeBtn">Test Shake</button>
+      </div>
+    </div>
   </div>
 
-  <button id="vibrate">Test Vibration</button>
-  <button id="startSteps">Start Step Counter</button>
-  <button id="shake">Test Shake Detection</button>
-  <button id="toggleClock">12h / 24h</button>
+  <!-- ══════════════ TIMER VIEW ══════════════ -->
+  <div class="view" data-view="timer">
+    <div class="card">
+      <div class="label">COUNTDOWN</div>
+      <div class="big" id="timerDisplay">00:00</div>
+      <div class="row tight" style="justify-content:center; margin-top:8px;">
+        <button class="ghost" data-timer-preset="60">1m</button>
+        <button class="ghost" data-timer-preset="180">3m</button>
+        <button class="ghost" data-timer-preset="300">5m</button>
+        <button class="ghost" data-timer-preset="600">10m</button>
+      </div>
+      <div class="row tight" style="justify-content:center; margin-top:8px;">
+        <button id="timerStart">Start</button>
+        <button class="ghost" id="timerPause">Pause</button>
+        <button class="ghost" id="timerReset">Reset</button>
+      </div>
+    </div>
 
+    <div class="card">
+      <div class="label">STOPWATCH</div>
+      <div class="big" id="swDisplay">00:00.0</div>
+      <div class="row tight" style="justify-content:center; margin-top:8px;">
+        <button id="swStart">Start</button>
+        <button class="ghost" id="swLap">Lap</button>
+        <button class="ghost" id="swReset">Reset</button>
+      </div>
+      <div class="list" id="lapList"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">ALARMS</div>
+      <div class="row tight" style="margin-top:8px;">
+        <input type="number" id="alarmH" min="0" max="23" placeholder="HH" style="width:70px; text-align:center;">
+        <input type="number" id="alarmM" min="0" max="59" placeholder="MM" style="width:70px; text-align:center;">
+        <input type="text" id="alarmLabel" placeholder="Label" style="flex:1;">
+        <button id="alarmAdd">+</button>
+      </div>
+      <div class="list" id="alarmList"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ AI VIEW ══════════════ -->
+  <div class="view" data-view="ai">
+    <div class="card">
+      <div class="label">ASK NEXUS</div>
+      <textarea id="aiQuestion" placeholder="Ask NEXUS anything…"></textarea>
+      <div class="row tight" style="justify-content:center;">
+        <button id="aiAsk">Ask</button>
+        <button class="ghost" id="aiClear">Clear history</button>
+      </div>
+    </div>
+    <div class="card" id="aiAnswerCard" style="display:none;">
+      <div class="label">ANSWER</div>
+      <div id="aiAnswer" style="text-align:left; line-height:1.5; font-size:15px;"></div>
+    </div>
+    <div class="card">
+      <div class="label">STATUS</div>
+      <div class="small" id="aiStatus">No API key yet — open Settings.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ PAIR VIEW ══════════════ -->
+  <div class="view" data-view="pair">
+    <div class="card">
+      <div class="label">PAIRING</div>
+      <div class="small" id="pairStatus">Not connected</div>
+      <div id="pairCodeDisplay" class="med" style="margin:10px 0;">—</div>
+      <div id="pairSetup">
+        <input type="text" id="pairName" placeholder="Your name (e.g. Alex)" maxlength="20">
+        <div class="row tight" style="justify-content:center; margin-top:6px;">
+          <button id="pairCreate">Create code</button>
+          <button class="ghost" id="pairJoinToggle">Join code</button>
+        </div>
+        <div id="pairJoinRow" style="display:none; margin-top:8px;">
+          <input type="text" id="pairJoinCode" placeholder="Paste partner's code">
+          <button id="pairJoinBtn" style="margin-top:6px;">Join</button>
+        </div>
+      </div>
+      <div id="pairActions" style="display:none; margin-top:12px;">
+        <div class="row tight" style="justify-content:center;">
+          <button id="pairPoke">👋 Poke</button>
+          <button class="ghost" id="pairBuzz">📳 Buzz</button>
+        </div>
+        <input type="text" id="pairMsg" placeholder="Type a message…" style="margin-top:8px;">
+        <button id="pairSend" style="margin-top:6px;">Send message</button>
+        <button class="ghost" id="pairLeave" style="margin-top:6px;">Leave pairing</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">MESSAGES</div>
+      <div class="list" id="pairMessages"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ GAMES VIEW ══════════════ -->
+  <div class="view" data-view="games">
+    <div class="tabs" style="padding:0 0 8px;">
+      <button class="tab active" data-game="ttt">Tic-Tac-Toe</button>
+      <button class="tab" data-game="snake">Snake</button>
+      <button class="tab" data-game="2048">2048</button>
+    </div>
+
+    <div class="game-panel" data-game-panel="ttt">
+      <div class="card">
+        <div class="label">TIC-TAC-TOE</div>
+        <div class="small" id="tttStatus">Your turn (X)</div>
+        <div class="grid3" id="tttBoard"></div>
+        <button class="ghost" id="tttReset">New game</button>
+      </div>
+    </div>
+
+    <div class="game-panel" data-game-panel="snake" style="display:none;">
+      <div class="card">
+        <div class="label">SNAKE</div>
+        <div class="small" id="snakeStatus">Tap Start</div>
+        <canvas id="snakeCanvas" width="288" height="288" class="snake-canvas"></canvas>
+        <div class="arrow-pad">
+          <span></span><button data-dir="up">▲</button><span></span>
+          <button data-dir="left">◀</button><span></span><button data-dir="right">▶</button>
+          <span></span><button data-dir="down">▼</button><span></span>
+        </div>
+        <div class="row tight" style="justify-content:center;">
+          <button id="snakeStart">Start</button>
+          <button class="ghost" id="snakeReset">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-panel" data-game-panel="2048" style="display:none;">
+      <div class="card">
+        <div class="label">2048</div>
+        <div class="small">Score: <span id="g2048Score">0</span> · Best: <span id="g2048Best">0</span></div>
+        <div class="g2048-grid" id="g2048Grid"></div>
+        <div class="arrow-pad">
+          <span></span><button data-g2048="up">▲</button><span></span>
+          <button data-g2048="left">◀</button><span></span><button data-g2048="right">▶</button>
+          <span></span><button data-g2048="down">▼</button><span></span>
+        </div>
+        <button class="ghost" id="g2048Reset">New game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SETTINGS VIEW ══════════════ -->
+  <div class="view" data-view="settings">
+    <div class="card">
+      <div class="label">GROQ API KEY</div>
+      <input type="password" id="setGroqKey" placeholder="gsk_…">
+      <div class="small">Get one at console.groq.com/keys</div>
+    </div>
+    <div class="card">
+      <div class="label">STEP GOAL</div>
+      <input type="number" id="setStepsGoal" min="100" max="50000" step="500">
+    </div>
+    <div class="card">
+      <div class="label">AUTO-SLEEP</div>
+      <select id="setAutoSleep">
+        <option value="15000">15 seconds</option>
+        <option value="30000">30 seconds</option>
+        <option value="60000">1 minute</option>
+        <option value="120000">2 minutes</option>
+        <option value="0">Never</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="label">HAPTICS</div>
+      <div class="row tight" style="justify-content:center;">
+        <button id="setHapticsOn">Enabled</button>
+        <button class="ghost" id="setHapticsOff">Disabled</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">DANGER ZONE</div>
+      <button class="ghost" id="setReset" style="color:#ff7f96; border-color:#ff7f96;">Reset all settings</button>
+    </div>
+  </div>
+
+  <!-- Load core first, then every feature module -->
   <script src="nexus-watch-core.js"></script>
   <script src="nexus-watch-sensors.js"></script>
+  <script src="nexus-watch-timer.js"></script>
+  <script src="nexus-watch-ai.js"></script>
+  <script src="nexus-watch-settings.js"></script>
+  <script src="nexus-watch-pair.js"></script>
+  <script src="nexus-watch-games.js"></script>
+
   <script>
+  (function () {
+    'use strict';
     const W = window.NexusWatch;
+    const $ = (id) => document.getElementById(id);
+    const show = (el, on) => el.style.display = on ? '' : 'none';
 
-    // Clock — uses the auto-formatting method
+    // ═══════════════════════════════════════════════════════════
+    // TABS
+    // ═══════════════════════════════════════════════════════════
+    document.querySelectorAll('.tab[data-view]').forEach(t => {
+      t.onclick = () => {
+        document.querySelectorAll('.tab[data-view]').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        document.querySelector('.view[data-view="' + t.dataset.view + '"]').classList.add('active');
+        W.Haptics.tap();
+      };
+    });
+    document.querySelectorAll('.tab[data-game]').forEach(t => {
+      t.onclick = () => {
+        document.querySelectorAll('.tab[data-game]').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.game-panel').forEach(x => x.style.display = 'none');
+        t.classList.add('active');
+        document.querySelector('.game-panel[data-game-panel="' + t.dataset.game + '"]').style.display = '';
+      };
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // CLOCK VIEW
+    // ═══════════════════════════════════════════════════════════
     W.Bus.on('clock:second', () => {
-      document.getElementById('time').textContent = W.Clock.time();
-      document.getElementById('date').textContent = W.Clock.dateLine(new Date());
+      $('time').textContent = W.Clock.time();
+      $('date').textContent = W.Clock.dateLine(new Date());
     });
+    W.Bus.on('clock:format-changed', () => { $('time').textContent = W.Clock.time(); });
+    $('toggleClock').onclick = () => { W.Clock.toggleFormat(); W.Haptics.tap(); };
 
-    // Clock format toggle
-    W.Bus.on('clock:format-changed', () => {
-      document.getElementById('time').textContent = W.Clock.time();
-    });
+    W.Bus.on('steps:step', ({ today }) => { $('steps').textContent = W.Util.formatNumber(today); });
+    W.Bus.on('steps:started', () => W.Haptics.success());
+    W.Bus.on('steps:permission-denied', () => alert('Motion permission denied'));
+    $('startSteps').onclick = () => W.Sensors.startAll();
 
-    // Steps
-    W.Bus.on('steps:step', ({ today }) => {
-      document.getElementById('steps').textContent = W.Util.formatNumber(today);
-    });
-    W.Bus.on('steps:started', () => {
-      W.Haptics.success();
-      console.log('Steps started');
-    });
-    W.Bus.on('steps:permission-denied', () => {
-      alert('Motion permission denied — steps will not count');
-    });
+    W.Bus.on('battery:ready', (b) => { if (b) $('battery').textContent = b.level + '% 🔋'; });
+    W.Bus.on('battery:level', ({ level }) => { $('battery').textContent = level + '% 🔋'; });
 
-    // Battery
-    W.Bus.on('battery:ready', (b) => {
-      if (b) document.getElementById('battery').textContent = b.level + '%';
-    });
-    W.Bus.on('battery:level', ({ level }) => {
-      document.getElementById('battery').textContent = level + '%';
-    });
+    W.Bus.on('motion:activity', ({ next }) => { $('motionState').textContent = next; });
 
-    // Shake
-    W.Bus.on('shake:detected', () => {
-      W.Haptics.triple();
-      console.log('Shake detected!');
-    });
+    $('vibrate').onclick = () => W.Haptics.success();
+    $('shakeBtn').onclick = () => { W.Haptics.alert(); alert('Shake your device now.'); };
+    W.Bus.on('shake:detected', () => W.Haptics.triple());
 
-    // Buttons
-    document.getElementById('vibrate').onclick = () => W.Haptics.success();
-    document.getElementById('startSteps').onclick = () => W.Sensors.startAll();
-    document.getElementById('shake').onclick = () => {
-      W.Haptics.alert();
-      alert('Now shake your device. When detected, it will triple-vibrate.');
-    };
-    document.getElementById('toggleClock').onclick = () => {
-      const now24 = W.Clock.toggleFormat();
-      W.Haptics.tap();
-      console.log('Clock format:', now24 ? '24-hour' : '12-hour');
-    };
-
-    // Goal progress
     setInterval(() => {
       const s = W.Sensors.Steps.get();
-      document.getElementById('goal').textContent =
-        `Goal: ${W.Util.formatNumber(s.goal)} (${Math.round(s.progress * 100)}%)`;
+      $('goal').textContent = 'Goal: ' + W.Util.formatNumber(s.goal) + ' (' + Math.round(s.progress * 100) + '%)';
     }, 1000);
+
+    // ═══════════════════════════════════════════════════════════
+    // TIMER VIEW
+    // ═══════════════════════════════════════════════════════════
+    let pendingTimerMs = 60000;
+    document.querySelectorAll('[data-timer-preset]').forEach(b => {
+      b.onclick = () => {
+        pendingTimerMs = parseInt(b.dataset.timerPreset, 10) * 1000;
+        $('timerDisplay').textContent = W.Util.formatDuration(pendingTimerMs);
+        W.Haptics.tap();
+      };
+    });
+    $('timerStart').onclick = () => { W.Timer.start(pendingTimerMs); W.Haptics.tap(); };
+    $('timerPause').onclick = () => { W.Timer.pause(); W.Haptics.tap(); };
+    $('timerReset').onclick = () => { W.Timer.stop(); $('timerDisplay').textContent = W.Util.formatDuration(pendingTimerMs); };
+
+    W.Bus.on('timer:tick', ({ remainingMs }) => { $('timerDisplay').textContent = W.Util.formatDuration(remainingMs); });
+    W.Bus.on('timer:done', () => { $('timerDisplay').textContent = 'DONE'; });
+
+    // Stopwatch
+    $('swStart').onclick = () => {
+      if (W.Stopwatch.state === 'running') W.Stopwatch.pause();
+      else if (W.Stopwatch.state === 'paused') W.Stopwatch.resume();
+      else W.Stopwatch.start();
+    };
+    $('swLap').onclick = () => W.Stopwatch.lap();
+    $('swReset').onclick = () => { W.Stopwatch.reset(); $('lapList').innerHTML = ''; $('swDisplay').textContent = '00:00.0'; };
+
+    W.Bus.on('stopwatch:tick', ({ elapsedMs }) => {
+      const total = elapsedMs / 1000;
+      const m = Math.floor(total / 60);
+      const s = (total % 60).toFixed(1);
+      $('swDisplay').textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(4, '0');
+    });
+    W.Bus.on('stopwatch:lap', (lap) => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      div.innerHTML = '<span>Lap ' + lap.n + '</span><span>' + W.Util.formatDuration(lap.delta) + '</span>';
+      $('lapList').prepend(div);
+    });
+
+    // Alarms
+    function renderAlarms() {
+      const list = $('alarmList');
+      list.innerHTML = '';
+      W.Alarm.all.forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        const time = String(a.hour).padStart(2, '0') + ':' + String(a.minute).padStart(2, '0');
+        div.innerHTML = '<span>' + time + ' · ' + a.label + '</span>';
+        const rm = document.createElement('button');
+        rm.className = 'ghost'; rm.textContent = '✕'; rm.style.padding = '4px 10px';
+        rm.onclick = () => { W.Alarm.remove(a.id); renderAlarms(); };
+        div.appendChild(rm);
+        list.appendChild(div);
+      });
+    }
+    $('alarmAdd').onclick = () => {
+      const h = parseInt($('alarmH').value, 10);
+      const m = parseInt($('alarmM').value, 10);
+      if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return alert('Enter valid HH:MM');
+      W.Alarm.add({ hour: h, minute: m, label: $('alarmLabel').value || 'Alarm' });
+      $('alarmH').value = ''; $('alarmM').value = ''; $('alarmLabel').value = '';
+      renderAlarms();
+    };
+    W.Alarm.start();
+    renderAlarms();
+
+    // ═══════════════════════════════════════════════════════════
+    // AI VIEW
+    // ═══════════════════════════════════════════════════════════
+    function aiStatus() {
+      $('aiStatus').textContent = W.AI.hasKey() ? '✅ Groq key present' : '⚠️ No Groq key yet — open Settings.';
+    }
+    aiStatus();
+    W.Bus.on('ai:key-set', aiStatus);
+
+    $('aiAsk').onclick = async () => {
+      const q = $('aiQuestion').value.trim();
+      if (!q) return;
+      const btn = $('aiAsk');
+      btn.disabled = true; btn.textContent = 'Thinking…';
+      show($('aiAnswerCard'), true);
+      $('aiAnswer').textContent = '…';
+      try {
+        const ans = await W.AI.ask(q);
+        $('aiAnswer').textContent = ans;
+      } catch (e) {
+        $('aiAnswer').textContent = '❌ ' + e.message;
+      } finally {
+        btn.disabled = false; btn.textContent = 'Ask';
+      }
+    };
+    $('aiClear').onclick = () => { W.AI.clearHistory(); W.Haptics.double(); };
+
+    // ═══════════════════════════════════════════════════════════
+    // PAIR VIEW
+    // ═══════════════════════════════════════════════════════════
+    function renderPair() {
+      const st = $('pairStatus');
+      if (W.Pair.code) {
+        st.innerHTML = '<span class="status-dot ' + (W.Pair.connected ? 'dot-on' : 'dot-off') + '"></span>' +
+          (W.Pair.connected ? 'Connected' : 'Connecting…');
+        $('pairCodeDisplay').textContent = W.Pair.code;
+        show($('pairSetup'), false);
+        show($('pairActions'), true);
+      } else {
+        st.textContent = 'Not connected';
+        $('pairCodeDisplay').textContent = '—';
+        show($('pairSetup'), true);
+        show($('pairActions'), false);
+      }
+    }
+    renderPair();
+    W.Bus.on('pair:connected', renderPair);
+    W.Bus.on('pair:disconnected', renderPair);
+    W.Bus.on('pair:code-created', renderPair);
+    W.Bus.on('pair:joined', renderPair);
+    W.Bus.on('pair:left', () => { $('pairMessages').innerHTML = ''; renderPair(); });
+
+    $('pairCreate').onclick = () => {
+      const name = $('pairName').value.trim() || 'Me';
+      W.Pair.createCode(name);
+      W.Haptics.success();
+    };
+    $('pairJoinToggle').onclick = () => {
+      const r = $('pairJoinRow');
+      show(r, r.style.display === 'none');
+    };
+    $('pairJoinBtn').onclick = () => {
+      const code = $('pairJoinCode').value.trim();
+      if (!code) return;
+      const name = $('pairName').value.trim() || 'Me';
+      W.Pair.joinCode(code, name);
+      W.Haptics.success();
+    };
+    $('pairPoke').onclick = () => W.Pair.poke();
+    $('pairBuzz').onclick = () => W.Pair.buzz();
+    $('pairSend').onclick = () => {
+      const m = $('pairMsg').value.trim();
+      if (!m) return;
+      W.Pair.text(m);
+      $('pairMsg').value = '';
+    };
+    $('pairLeave').onclick = () => W.Pair.leave();
+
+    W.Bus.on('pair:message', (msg) => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      let txt = '';
+      if (msg.type === 'text') txt = '💬 ' + (msg.text || '');
+      else if (msg.type === 'poke') txt = '👋 ' + (msg.from || 'Partner') + ' poked you!';
+      else if (msg.type === 'buzz') txt = '📳 ' + (msg.from || 'Partner') + ' sent a buzz';
+      else if (msg.type === 'emoji') txt = (msg.emoji || '') + ' from ' + (msg.from || 'Partner');
+      else txt = '📩 ' + msg.type;
+      div.innerHTML = '<span>' + txt + '</span><span class="small">' + new Date(msg._at).toLocaleTimeString().slice(0, 5) + '</span>';
+      $('pairMessages').prepend(div);
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // GAMES VIEW
+    // ═══════════════════════════════════════════════════════════
+    // Tic-Tac-Toe
+    const tttBoard = $('tttBoard');
+    for (let i = 0; i < 9; i++) {
+      const c = document.createElement('div');
+      c.className = 'cell';
+      c.dataset.i = i;
+      c.onclick = () => {
+        if (W.Games.TicTacToe.state.over) return;
+        if (!W.Games.TicTacToe.move(i)) return;
+        setTimeout(() => W.Games.TicTacToe.aiMove(), 200);
+      };
+      tttBoard.appendChild(c);
+    }
+    $('tttReset').onclick = () => W.Games.TicTacToe.reset();
+
+    W.Bus.on('ttt:update', (s) => {
+      tttBoard.querySelectorAll('.cell').forEach((c, i) => {
+        c.textContent = s.board[i] || '';
+        c.className = 'cell' + (s.board[i] === 'X' ? ' x' : s.board[i] === 'O' ? ' o' : '');
+      });
+      let msg = 'Your turn (X)';
+      if (s.winner === 'X') msg = '🎉 You win!';
+      else if (s.winner === 'O') msg = '💀 NEXUS wins';
+      else if (s.winner === 'draw') msg = '🤝 Draw';
+      else if (s.turn === 'O') msg = 'NEXUS thinking…';
+      $('tttStatus').textContent = msg;
+    });
+
+    // Snake
+    const snakeCanvas = $('snakeCanvas');
+    const snakeCtx = snakeCanvas.getContext('2d');
+    const CELL = snakeCanvas.width / 12;
+
+    function drawSnake(s) {
+      snakeCtx.fillStyle = '#04111d';
+      snakeCtx.fillRect(0, 0, snakeCanvas.width, snakeCanvas.height);
+      snakeCtx.fillStyle = '#ff6b9f';
+      snakeCtx.fillRect(s.food.x * CELL + 2, s.food.y * CELL + 2, CELL - 4, CELL - 4);
+      s.snake.forEach((seg, i) => {
+        snakeCtx.fillStyle = i === 0 ? '#63d4ff' : '#3a9ec4';
+        snakeCtx.fillRect(seg.x * CELL + 1, seg.y * CELL + 1, CELL - 2, CELL - 2);
+      });
+    }
+    W.Bus.on('snake:update', (s) => {
+      drawSnake(s);
+      $('snakeStatus').textContent = s.over ? ('Game over · score ' + s.score) : ('Score: ' + s.score);
+    });
+    W.Bus.on('snake:over', ({ score }) => { $('snakeStatus').textContent = 'Game over · score ' + score; });
+    $('snakeStart').onclick = () => { W.Games.Snake.stop(); W.Games.Snake.start(); };
+    $('snakeReset').onclick = () => { W.Games.Snake.stop(); W.Games.Snake.reset(); };
+    document.querySelectorAll('[data-dir]').forEach(b => {
+      b.onclick = () => {
+        const d = b.dataset.dir;
+        if (d === 'up')    W.Games.Snake.setDir(0, -1);
+        if (d === 'down')  W.Games.Snake.setDir(0, 1);
+        if (d === 'left')  W.Games.Snake.setDir(-1, 0);
+        if (d === 'right') W.Games.Snake.setDir(1, 0);
+      };
+    });
+
+    // 2048
+    const g2048Grid = $('g2048Grid');
+    for (let i = 0; i < 16; i++) {
+      const c = document.createElement('div');
+      c.className = 'g2048-cell';
+      g2048Grid.appendChild(c);
+    }
+    W.Bus.on('g2048:update', (s) => {
+      g2048Grid.querySelectorAll('.g2048-cell').forEach((c, i) => {
+        const r = Math.floor(i / 4), col = i % 4;
+        const v = s.grid[r][col];
+        c.textContent = v || '';
+        c.dataset.v = v || '';
+      });
+      $('g2048Score').textContent = s.score;
+      $('g2048Best').textContent = s.best;
+    });
+    document.querySelectorAll('[data-g2048]').forEach(b => {
+      b.onclick = () => W.Games.Game2048.move(b.dataset.g2048);
+    });
+    $('g2048Reset').onclick = () => W.Games.Game2048.reset();
+
+    // ═══════════════════════════════════════════════════════════
+    // SETTINGS VIEW
+    // ═══════════════════════════════════════════════════════════
+    function loadSettings() {
+      $('setGroqKey').value = W.Settings.get('groqKey') || '';
+      $('setStepsGoal').value = W.Settings.get('stepsGoal');
+      $('setAutoSleep').value = String(W.Settings.get('autoSleepMs'));
+    }
+    loadSettings();
+
+    $('setGroqKey').onchange = () => W.Settings.set('groqKey', $('setGroqKey').value.trim());
+    $('setStepsGoal').onchange = () => W.Settings.set('stepsGoal', parseInt($('setStepsGoal').value, 10) || 8000);
+    $('setAutoSleep').onchange = () => W.Settings.set('autoSleepMs', parseInt($('setAutoSleep').value, 10));
+    $('setHapticsOn').onclick = () => { W.Settings.set('hapticsEnabled', true); W.Haptics.success(); };
+    $('setHapticsOff').onclick = () => W.Settings.set('hapticsEnabled', false);
+    $('setReset').onclick = () => {
+      if (!confirm('Reset all settings?')) return;
+      W.Settings.reset();
+      loadSettings();
+    };
+
+    console.log('✅ test.html wired up');
+  })();
   </script>
 </body>
 </html>
